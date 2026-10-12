@@ -1,0 +1,5 @@
+symbol,side,qty,entry,multiplier
+AAPL US Equity,long,100,220,1
+MSFT US Equity,long,50,500,1
+TSLA US Equity,short,40,430,1
+VOD LN Equity,long,5000,70,1

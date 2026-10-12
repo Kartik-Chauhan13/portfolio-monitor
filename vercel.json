@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "functions": {
+    "api/quotes.js": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/quotes",
+      "dest": "/api/quotes.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ]
+}

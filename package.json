@@ -1,0 +1,13 @@
+{
+  "name": "portfolio-monitor",
+  "version": "1.0.0",
+  "description": "Live P&L dashboard for open trading-challenge positions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

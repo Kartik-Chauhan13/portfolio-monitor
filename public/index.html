@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Monitor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo">▲</span>
+    <div>
+      <h1>Portfolio Monitor</h1>
+      <p class="sub" id="subtitle">Trading challenge · live P&amp;L</p>
+    </div>
+  </div>
+  <div class="controls">
+    <span class="status"><i id="dot" class="dot"></i><span id="statusText">connecting…</span></span>
+    <label class="inline">Refresh
+      <select id="interval">
+        <option value="5">5s</option>
+        <option value="10" selected>10s</option>
+        <option value="30">30s</option>
+        <option value="60">60s</option>
+      </select>
+    </label>
+    <button id="refreshBtn" class="btn">Refresh now</button>
+    <button id="addBtn" class="btn primary">+ Add position</button>
+  </div>
+</header>
+
+<main>
+  <section class="cards" id="cards"></section>
+
+  <section class="grid2">
+    <div class="panel">
+      <div class="panel-h"><h2>Session P&amp;L</h2><span class="muted" id="histNote"></span></div>
+      <div id="histChart" class="chart"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Unrealized P&amp;L by position</h2></div>
+      <div id="barChart" class="chart"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h">
+      <h2>Open positions <span class="muted" id="posCount"></span></h2>
+      <div class="actions">
+        <button id="settingsBtn" class="btn small">Account settings</button>
+        <button id="importBtn" class="btn small">Import CSV</button>
+        <button id="exportBtn" class="btn small">Export CSV</button>
+        <button id="clearBtn" class="btn small danger">Clear all</button>
+        <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="table">
+        <thead>
+          <tr>
+            <th data-k="symbol">Symbol</th>
+            <th data-k="side">Side</th>
+            <th data-k="qty" class="r">Qty</th>
+            <th data-k="entry" class="r">Entry</th>
+            <th data-k="price" class="r">Last</th>
+            <th data-k="dayPct" class="r">Day %</th>
+            <th data-k="dayPnl" class="r">Day P&amp;L</th>
+            <th data-k="pnl" class="r">Unreal. P&amp;L</th>
+            <th data-k="pnlPct" class="r">Return %</th>
+            <th data-k="mv" class="r">Mkt value</th>
+            <th data-k="weight" class="r">Weight</th>
+            <th>Intraday</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="emptyHint" hidden>No positions yet — click “+ Add position”.</p>
+  </section>
+
+  <p class="foot">
+    Prices come from Yahoo Finance via the local server and can be delayed (up to ~15 min on some exchanges), so they may differ slightly from the Bloomberg challenge feed.
+    Your positions are stored only in this browser (localStorage). Not investment advice.
+  </p>
+</main>
+
+<dialog id="posDialog">
+  <form method="dialog" id="posForm">
+    <h3 id="dlgTitle">Add position</h3>
+    <label>Ticker
+      <input name="symbol" required placeholder="AAPL, VOD LN Equity, EURUSD Curncy, ^GSPC" autocomplete="off">
+      <small id="symPreview" class="muted"></small>
+    </label>
+    <div class="row">
+      <label>Side
+        <select name="side"><option value="long">Long</option><option value="short">Short</option></select>
+      </label>
+      <label>Quantity
+        <input name="qty" type="number" step="any" min="0" required>
+      </label>
+    </div>
+    <div class="row">
+      <label>Entry price
+        <input name="entry" type="number" step="any" min="0" required>
+      </label>
+      <label>Multiplier
+        <input name="mult" type="number" step="any" min="0" value="1">
+      </label>
+    </div>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="cancelDlg">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="setDialog">
+  <form method="dialog" id="setForm">
+    <h3>Account settings</h3>
+    <label>Starting capital
+      <input name="capital" type="number" step="any" min="0" required>
+    </label>
+    <label>Realized P&amp;L so far (closed trades)
+      <input name="realized" type="number" step="any" value="0">
+    </label>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="cancelSet">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
