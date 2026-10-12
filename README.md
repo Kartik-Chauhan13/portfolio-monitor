@@ -23,6 +23,14 @@ Use a different port with `PORT=8080 npm start`.
 
 The Vercel deployment uses the same Yahoo Finance quote endpoint as the local server. Quote data is cached briefly within each serverless function instance.
 
+## Shared positions across devices
+
+The dashboard can store one shared portfolio centrally in Supabase without Vercel environment variables. Create a Supabase project, run [supabase.sql](./supabase.sql) in the SQL Editor, then put your Supabase Project URL and publishable `anon` key in the constants at the top of `public/app.js`.
+
+Use only the publishable `anon` key in the browser. Never put a Supabase `service_role` or secret key in `public/app.js`.
+
+Redeploy after committing the change. Everyone opening the deployed website will then read and update the same portfolio, with changes polled every five seconds. There is no login or access control: anyone who has the website URL can edit the shared portfolio.
+
 ## What you get
 
 - Total, day and unrealized P&L, return on capital, equity

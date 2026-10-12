@@ -3,8 +3,66 @@
 
   // ---------- storage ----------
   const LS_POS = 'pf.positions.v1', LS_SET = 'pf.settings.v1', LS_HIST = 'pf.history.v1';
+  // Fill these with Supabase's Project URL and publishable anon key.
+  const SUPABASE_URL = 'https://rmvdlxmvtbkzxqenvdbv.supabase.co/rest/v1/';
+  const SUPABASE_ANON_KEY = 'rmvdlxmvtbkzxqenvdbv';
+  const SHARED_PORTFOLIO_ID = 'shared';
+  let remoteUpdatedAt = null;
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  async function supabaseRequest(path, options = {}) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+    if (!response.ok) throw new Error('shared storage server ' + response.status);
+    return response.status === 204 ? null : response.json();
+  }
+
+  async function saveRemote() {
+    try {
+      const rows = await supabaseRequest(`portfolios?on_conflict=id`, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify([{
+          id: SHARED_PORTFOLIO_ID,
+          positions: state.positions,
+          settings: state.settings,
+          updated_at: new Date().toISOString(),
+        }]),
+      });
+      remoteUpdatedAt = rows[0].updated_at;
+    } catch (error) {
+      setStatus('bad', 'shared storage unavailable — ' + error.message);
+    }
+  }
+
+  async function loadRemote() {
+    try {
+      const rows = await supabaseRequest(`portfolios?id=eq.${SHARED_PORTFOLIO_ID}&select=positions,settings,updated_at`);
+      if (!rows.length) throw new Error('shared portfolio row not found');
+      const data = rows[0];
+      if (data.updated_at === remoteUpdatedAt) return;
+      remoteUpdatedAt = data.updated_at;
+      if (Array.isArray(data.positions) && data.positions.length) {
+        state.positions = data.positions;
+        state.settings = Object.assign(state.settings, data.settings || {});
+        save(LS_POS, state.positions);
+        save(LS_SET, state.settings);
+        render();
+      } else if (state.positions.length) {
+        await saveRemote();
+      }
+    } catch (error) {
+      setStatus('bad', 'shared storage unavailable — ' + error.message);
+    }
+  }
 
   const SAMPLE = [
     { id: 's1', raw: 'AAPL US Equity', side: 'long', qty: 100, entry: 220, mult: 1 },
@@ -12,37 +70,11 @@
     { id: 's3', raw: 'TSLA US Equity', side: 'short', qty: 40, entry: 430, mult: 1 },
   ];
 
-  function readSharedState() {
-    const match = location.hash.match(/^#portfolio=([^&]+)$/);
-    if (!match) return null;
-    try {
-      const binary = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
-      const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
-      const data = JSON.parse(new TextDecoder().decode(bytes));
-      if (!Array.isArray(data.positions)) return null;
-      return {
-        positions: data.positions,
-        settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  function encodeSharedState(data) {
-    const bytes = new TextEncoder().encode(JSON.stringify(data));
-    let binary = '';
-    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-  const shared = readSharedState();
   const state = {
-    positions: shared ? shared.positions : load(LS_POS, SAMPLE),
+    positions: load(LS_POS, SAMPLE),
     settings: Object.assign(
       { capital: 1000000, realized: 0, interval: 10 },
       load(LS_SET, {}),
-      shared ? shared.settings : {},
     ),
     history: load(LS_HIST, []),
     quotes: {},
@@ -301,25 +333,6 @@
   // ---------- dialogs ----------
   const posDlg = $('#posDialog'), posForm = $('#posForm'), setDlg = $('#setDialog'), setForm = $('#setForm');
 
-  function copyShareLink() {
-    const encoded = encodeSharedState({
-      positions: state.positions,
-      settings: {
-        capital: state.settings.capital,
-        realized: state.settings.realized,
-        interval: state.settings.interval,
-      },
-    });
-    const url = location.href.split('#')[0] + '#portfolio=' + encoded;
-    navigator.clipboard.writeText(url).then(() => {
-      const button = $('#shareBtn');
-      const original = button.textContent;
-      button.textContent = 'Link copied';
-      setTimeout(() => { button.textContent = original; }, 1600);
-    }).catch(() => {
-      window.prompt('Copy this share link:', url);
-    });
-  }
 
   function openPos(id) {
     state.editingId = id || null;
@@ -353,6 +366,7 @@
     const i = state.positions.findIndex(x => x.id === rec.id);
     if (i >= 0) state.positions[i] = rec; else state.positions.push(rec);
     save(LS_POS, state.positions);
+    saveRemote();
     posDlg.close();
     render();
     refresh();
@@ -369,6 +383,7 @@
     state.settings.capital = parseFloat(setForm.capital.value) || 0;
     state.settings.realized = parseFloat(setForm.realized.value) || 0;
     save(LS_SET, state.settings);
+    saveRemote();
     setDlg.close();
     render();
   });
@@ -376,9 +391,13 @@
   // ---------- events ----------
   $('#addBtn').onclick = () => openPos();
   $('#refreshBtn').onclick = refresh;
-  $('#shareBtn').onclick = copyShareLink;
   $('#interval').value = String(state.settings.interval);
-  $('#interval').onchange = e => { state.settings.interval = +e.target.value; save(LS_SET, state.settings); schedule(); };
+  $('#interval').onchange = e => {
+    state.settings.interval = +e.target.value;
+    save(LS_SET, state.settings);
+    saveRemote();
+    schedule();
+  };
 
   $('#tbody').addEventListener('click', e => {
     const ed = e.target.closest('[data-edit]'), dl = e.target.closest('[data-del]');
@@ -386,6 +405,7 @@
     if (dl && confirm('Remove this position?')) {
       state.positions = state.positions.filter(p => p.id !== dl.dataset.del);
       save(LS_POS, state.positions);
+      saveRemote();
       render();
     }
   });
@@ -400,6 +420,7 @@
     if (!confirm('Remove ALL positions and reset the P&L history?')) return;
     state.positions = []; state.history = [];
     save(LS_POS, []); save(LS_HIST, []);
+    saveRemote();
     render();
   };
 
@@ -429,6 +450,7 @@
     if (confirm('Import ' + out.length + ' positions? OK = replace existing, Cancel = add to existing.')) state.positions = out;
     else state.positions = state.positions.concat(out);
     save(LS_POS, state.positions);
+    saveRemote();
     render(); refresh();
   };
 
@@ -436,5 +458,7 @@
   render();
   refresh();
   schedule();
+  loadRemote();
+  setInterval(loadRemote, 5000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 })();
