@@ -4,14 +4,17 @@
   // ---------- storage ----------
   const LS_POS = 'pf.positions.v1', LS_SET = 'pf.settings.v1', LS_HIST = 'pf.history.v1';
   // Fill these with Supabase's Project URL and publishable anon key.
-  const SUPABASE_URL = 'https://rmvdlxmvtbkzxqenvdbv.supabase.co/rest/v1/';
-  const SUPABASE_ANON_KEY = 'rmvdlxmvtbkzxqenvdbv';
+  const SUPABASE_URL = 'https://rmvdlxmvtbkzxqenvdbv.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_Rdm5qKSSVFqlzhDVlHGH7A_nJA__vuy';
   const SHARED_PORTFOLIO_ID = 'shared';
   let remoteUpdatedAt = null;
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
   async function supabaseRequest(path, options = {}) {
+    if (SUPABASE_URL.includes('YOUR_PROJECT_ID') || SUPABASE_ANON_KEY.startsWith('REPLACE_')) {
+      throw new Error('Supabase URL or publishable anon key is not configured');
+    }
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
       ...options,
       headers: {
