@@ -12,9 +12,38 @@
     { id: 's3', raw: 'TSLA US Equity', side: 'short', qty: 40, entry: 430, mult: 1 },
   ];
 
+  function readSharedState() {
+    const match = location.hash.match(/^#portfolio=([^&]+)$/);
+    if (!match) return null;
+    try {
+      const binary = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
+      const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+      const data = JSON.parse(new TextDecoder().decode(bytes));
+      if (!Array.isArray(data.positions)) return null;
+      return {
+        positions: data.positions,
+        settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function encodeSharedState(data) {
+    const bytes = new TextEncoder().encode(JSON.stringify(data));
+    let binary = '';
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  const shared = readSharedState();
   const state = {
-    positions: load(LS_POS, SAMPLE),
-    settings: Object.assign({ capital: 1000000, realized: 0, interval: 10 }, load(LS_SET, {})),
+    positions: shared ? shared.positions : load(LS_POS, SAMPLE),
+    settings: Object.assign(
+      { capital: 1000000, realized: 0, interval: 10 },
+      load(LS_SET, {}),
+      shared ? shared.settings : {},
+    ),
     history: load(LS_HIST, []),
     quotes: {},
     sort: { key: 'pnl', dir: -1 },
@@ -272,6 +301,26 @@
   // ---------- dialogs ----------
   const posDlg = $('#posDialog'), posForm = $('#posForm'), setDlg = $('#setDialog'), setForm = $('#setForm');
 
+  function copyShareLink() {
+    const encoded = encodeSharedState({
+      positions: state.positions,
+      settings: {
+        capital: state.settings.capital,
+        realized: state.settings.realized,
+        interval: state.settings.interval,
+      },
+    });
+    const url = location.href.split('#')[0] + '#portfolio=' + encoded;
+    navigator.clipboard.writeText(url).then(() => {
+      const button = $('#shareBtn');
+      const original = button.textContent;
+      button.textContent = 'Link copied';
+      setTimeout(() => { button.textContent = original; }, 1600);
+    }).catch(() => {
+      window.prompt('Copy this share link:', url);
+    });
+  }
+
   function openPos(id) {
     state.editingId = id || null;
     const p = state.positions.find(x => x.id === id);
@@ -327,6 +376,7 @@
   // ---------- events ----------
   $('#addBtn').onclick = () => openPos();
   $('#refreshBtn').onclick = refresh;
+  $('#shareBtn').onclick = copyShareLink;
   $('#interval').value = String(state.settings.interval);
   $('#interval').onchange = e => { state.settings.interval = +e.target.value; save(LS_SET, state.settings); schedule(); };
 
